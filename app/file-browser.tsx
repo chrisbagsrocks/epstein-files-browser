@@ -669,6 +669,18 @@ export function FileBrowser() {
   // Get celebrities with >99% confidence for the dropdown
   const celebrities = getCelebritiesAboveConfidence(99);
 
+  // Derive available volumes from files
+  const availableVolumes = useMemo(() => {
+    const volumes = new Set<string>();
+    initialFiles.forEach((f) => {
+      const parts = f.key.split("/");
+      if (parts.length > 0 && parts[0].startsWith("VOL")) {
+        volumes.add(parts[0]);
+      }
+    });
+    return Array.from(volumes).sort();
+  }, [initialFiles]);
+
   // Derive filtered and sorted files from initialFiles + filters
   const filteredFiles = useMemo(() => {
     let files = initialFiles;
@@ -754,7 +766,7 @@ export function FileBrowser() {
               </div>
             </div>
             <a
-              href="https://github.com/RhysSullivan/epstein-files-browser"
+              href="https://github.com/chrisbagsrocks/epstein-files-browser"
               target="_blank"
               rel="noopener noreferrer"
               className="p-2.5 rounded-xl bg-secondary hover:bg-accent text-muted-foreground hover:text-foreground transition-all duration-200 hover:scale-105"
@@ -783,13 +795,11 @@ export function FileBrowser() {
                 className="appearance-none px-4 py-2.5 pr-10 bg-secondary border border-border rounded-xl text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all cursor-pointer hover:bg-accent"
               >
                 <option value="All">All Collections</option>
-                <option value="VOL00001">Volume 1</option>
-                <option value="VOL00002">Volume 2</option>
-                <option value="VOL00003">Volume 3</option>
-                <option value="VOL00004">Volume 4</option>
-                <option value="VOL00005">Volume 5</option>
-                <option value="VOL00006">Volume 6</option>
-                <option value="VOL00007">Volume 7</option>
+                {availableVolumes.map((vol) => (
+                  <option key={vol} value={vol}>
+                    Volume {parseInt(vol.replace("VOL", ""), 10)}
+                  </option>
+                ))}
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
                 <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">

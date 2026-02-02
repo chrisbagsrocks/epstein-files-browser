@@ -13,7 +13,7 @@ export function CelebrityDisclaimer({ className = "" }: { className?: string }) 
         </a>
         . Results may not be accurate.{" "}
         <a
-          href="https://github.com/RhysSullivan/epstein-files-browser"
+          href="https://github.com/chrisbagsrocks/epstein-files-browser"
           target="_blank"
           rel="noopener noreferrer"
           className="text-primary/80 hover:text-primary underline-offset-2 hover:underline transition-colors"
