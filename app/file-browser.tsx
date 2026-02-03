@@ -115,7 +115,7 @@ function FileCard({ file, onClick, onMouseEnter }: { file: FileItem; onClick: ()
 // Get celebrities for a specific file and page
 function getCelebritiesForPage(filePath: string, pageNumber: number): { name: string; confidence: number }[] {
   const celebrities: { name: string; confidence: number }[] = [];
-  
+
   for (const celebrity of CELEBRITY_DATA) {
     for (const appearance of celebrity.appearances) {
       if (appearance.file === filePath && appearance.page === pageNumber) {
@@ -126,7 +126,7 @@ function getCelebritiesForPage(filePath: string, pageNumber: number): { name: st
       }
     }
   }
-  
+
   return celebrities.sort((a, b) => b.confidence - a.confidence).filter(celeb => celeb.confidence > 99);
 }
 
@@ -152,17 +152,17 @@ async function loadPagesFromImages(filePath: string, pageCount: number): Promise
 // Prefetch PDF pages in the background (uses pre-rendered images if available)
 async function prefetchPdf(filePath: string): Promise<void> {
   if (getPdfPages(filePath) || prefetchingSet.has(filePath)) return;
-  
+
   prefetchingSet.add(filePath);
-  
+
   try {
     const manifest = getPdfManifest();
     const manifestEntry = manifest?.[filePath];
-    
+
     // If we have pre-rendered images in the manifest, use those
     if (manifestEntry && manifestEntry.pages > 0) {
       const imageUrls = await loadPagesFromImages(filePath, manifestEntry.pages);
-      
+
       // Prefetch the images by creating Image objects
       await Promise.all(
         imageUrls.map((url) => {
@@ -174,11 +174,11 @@ async function prefetchPdf(filePath: string): Promise<void> {
           });
         })
       );
-      
+
       setPdfPages(filePath, imageUrls);
       return;
     }
-    
+
     // Fallback to client-side PDF rendering if no pre-rendered images
     const fileUrl = `${WORKER_URL}/${filePath}`;
     const pdfjsLib = await import("pdfjs-dist");
@@ -223,7 +223,7 @@ function SharePopover({ filePath, queryString }: { filePath: string; queryString
   const [copied, setCopied] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
-  const shareUrl = typeof window !== "undefined" 
+  const shareUrl = typeof window !== "undefined"
     ? `${window.location.origin}/file/${encodeURIComponent(filePath)}${queryString}`
     : `/file/${encodeURIComponent(filePath)}${queryString}`;
 
@@ -275,8 +275,8 @@ function SharePopover({ filePath, queryString }: { filePath: string; queryString
               onClick={handleCopy}
               className={cn(
                 "px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors",
-                copied 
-                  ? "bg-green-500/20 text-green-400 border border-green-500/30" 
+                copied
+                  ? "bg-green-500/20 text-green-400 border border-green-500/30"
                   : "bg-primary hover:bg-primary/90 text-primary-foreground"
               )}
             >
@@ -304,17 +304,17 @@ function SharePopover({ filePath, queryString }: { filePath: string; queryString
 }
 
 // Modal component for viewing files
-function FileModal({ 
-  file, 
-  onClose, 
-  onPrev, 
+function FileModal({
+  file,
+  onClose,
+  onPrev,
   onNext,
   hasPrev,
   hasNext,
   queryString,
   nextFiles
-}: { 
-  file: FileItem; 
+}: {
+  file: FileItem;
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -327,7 +327,7 @@ function FileModal({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  
+
   const filePath = file.key;
   const fileId = getFileId(filePath);
   const fileUrl = `${WORKER_URL}/${filePath}`;
@@ -354,12 +354,12 @@ function FileModal({
 
   const handleTouchEnd = useCallback((e: TouchEvent) => {
     if (!touchStartRef.current) return;
-    
+
     const touch = e.changedTouches[0];
     const deltaX = touch.clientX - touchStartRef.current.x;
     const deltaY = touch.clientY - touchStartRef.current.y;
     const swipeThreshold = 50;
-    
+
     // Only trigger if horizontal swipe is dominant and exceeds threshold
     if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > swipeThreshold) {
       if (deltaX > 0 && hasPrev) {
@@ -368,7 +368,7 @@ function FileModal({
         onNext();
       }
     }
-    
+
     touchStartRef.current = null;
   }, [hasPrev, hasNext, onPrev, onNext]);
 
@@ -389,9 +389,9 @@ function FileModal({
   useEffect(() => {
     // Always reset state immediately when file changes
     setError(null);
-    
+
     const cached = getPdfPages(filePath);
-    
+
     if (cached && cached.length > 0) {
       setPages(cached);
       setLoading(false);
@@ -408,20 +408,20 @@ function FileModal({
       try {
         const manifest = getPdfManifest();
         const manifestEntry = manifest?.[filePath];
-        
+
         // If we have pre-rendered images in the manifest, use those
         if (manifestEntry && manifestEntry.pages > 0) {
           const imageUrls = await loadPagesFromImages(filePath, manifestEntry.pages);
-          
+
           if (cancelled) return;
-          
+
           // Set URLs directly - browser will load them
           setPages(imageUrls);
           setPdfPages(filePath, imageUrls);
           setLoading(false);
           return;
         }
-        
+
         // Fallback to client-side PDF rendering
         const pdfjsLib = await import("pdfjs-dist");
         pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -477,15 +477,15 @@ function FileModal({
       cancelled = true;
     };
   }, [fileUrl, filePath]);
-  
+
   // Prefetch next PDFs - use file keys as dependency to avoid array reference issues
   const nextFileKeys = nextFiles.map(f => f.key).join(',');
   useEffect(() => {
     if (loading || !nextFileKeys) return;
-    
+
     const keys = nextFileKeys.split(',').filter(Boolean);
     const timeoutIds: ReturnType<typeof setTimeout>[] = [];
-    
+
     // Prefetch next 5 files with staggered delays
     keys.forEach((key, index) => {
       const timeoutId = setTimeout(() => {
@@ -493,7 +493,7 @@ function FileModal({
       }, index * 100);
       timeoutIds.push(timeoutId);
     });
-    
+
     return () => {
       timeoutIds.forEach(clearTimeout);
     };
@@ -502,11 +502,11 @@ function FileModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div 
+      <div
         className="absolute inset-0 bg-background/95 backdrop-blur-sm"
         onClick={onClose}
       />
-      
+
       {/* Modal content */}
       <div className="relative w-full h-full flex flex-col">
         {/* Header */}
@@ -669,9 +669,14 @@ export function FileBrowser() {
   // Get celebrities with >99% confidence for the dropdown
   const celebrities = getCelebritiesAboveConfidence(99);
 
-  // Derive available volumes from files
+  // Derive available volumes from files, ensuring at least 1-12 are shown
   const availableVolumes = useMemo(() => {
     const volumes = new Set<string>();
+    // Baseline volumes 1-12
+    for (let i = 1; i <= 12; i++) {
+      volumes.add(`VOL${String(i).padStart(5, "0")}`);
+    }
+    // Add any others found in the files
     initialFiles.forEach((f) => {
       const parts = f.key.split("/");
       if (parts.length > 0 && parts[0].startsWith("VOL")) {
@@ -724,30 +729,30 @@ export function FileBrowser() {
     const str = params.toString();
     return str ? `?${str}` : "";
   }, [collectionFilter, celebrityFilter]);
-  
+
   // Modal state - find index from file key
   const selectedFileIndex = useMemo(() => {
     if (!openFile) return null;
     const index = filteredFiles.findIndex(f => f.key === openFile);
     return index >= 0 ? index : null;
   }, [openFile, filteredFiles]);
-  
+
   const selectedFile = selectedFileIndex !== null ? filteredFiles[selectedFileIndex] : null;
   const hasPrev = selectedFileIndex !== null && selectedFileIndex > 0;
   const hasNext = selectedFileIndex !== null && selectedFileIndex < filteredFiles.length - 1;
-  
+
   const handlePrev = useCallback(() => {
     if (selectedFileIndex !== null && selectedFileIndex > 0) {
       setOpenFile(filteredFiles[selectedFileIndex - 1].key);
     }
   }, [selectedFileIndex, filteredFiles, setOpenFile]);
-  
+
   const handleNext = useCallback(() => {
     if (selectedFileIndex !== null && selectedFileIndex < filteredFiles.length - 1) {
       setOpenFile(filteredFiles[selectedFileIndex + 1].key);
     }
   }, [selectedFileIndex, filteredFiles, setOpenFile]);
-  
+
   const handleClose = useCallback(() => {
     setOpenFile(null);
   }, [setOpenFile]);
@@ -867,10 +872,10 @@ export function FileBrowser() {
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {filteredFiles.map((file) => (
-            <FileCard 
-              key={file.key} 
-              file={file} 
-              onClick={() => setOpenFile(file.key)} 
+            <FileCard
+              key={file.key}
+              file={file}
+              onClick={() => setOpenFile(file.key)}
               onMouseEnter={() => prefetchPdf(file.key)}
             />
           ))}

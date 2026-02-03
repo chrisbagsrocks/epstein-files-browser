@@ -73,7 +73,7 @@ export default {
     // Serve PDF images manifest
     if (path === "api/pdf-manifest") {
       const manifestObject = await env.R2_BUCKET.get("pdfs-as-jpegs/manifest.json");
-      
+
       if (!manifestObject) {
         return new Response(JSON.stringify({ error: "Manifest not found" }), {
           status: 404,
@@ -95,7 +95,7 @@ export default {
     // Handle OG metadata endpoint for social media bots
     if (path === "og" || path === "api/og") {
       const filePath = url.searchParams.get("file");
-      
+
       if (!filePath) {
         return new Response("Missing file parameter", { status: 400 });
       }
@@ -103,12 +103,12 @@ export default {
       // Construct thumbnail URL - thumbnails are stored as .jpg versions of the PDF
       const thumbnailKey = `thumbnails/${filePath.replace(".pdf", ".jpg")}`;
       const thumbnailUrl = `${url.origin}/${thumbnailKey}`;
-      
+
       // Use the main site URL for the page link
       const siteUrl = "https://epstein-files-browser.vercel.app";
-      
+
       const html = generateOgHtml(filePath, thumbnailUrl, siteUrl);
-      
+
       return new Response(html, {
         headers: {
           "Content-Type": "text/html; charset=utf-8",
@@ -121,10 +121,10 @@ export default {
     if (path === "api/files-by-keys" && request.method === "POST") {
       const body = await request.json() as { keys: string[] };
       const keys = body.keys || [];
-      
+
       // Fetch metadata for each file in parallel
       const files: { key: string; size: number; uploaded: string }[] = [];
-      
+
       await Promise.all(
         keys.map(async (key) => {
           const obj = await env.R2_BUCKET.head(key);
@@ -155,49 +155,47 @@ export default {
       );
     }
 
-    // List all files endpoint (returns everything)
+    // List all files endpoint
     if (path === "api/all-files") {
-      const files: { key: string; size: number; uploaded: string }[] = [];
+      // 1. Get files currently in R2
+      const r2Files = new Map<string, { key: string; size: number; uploaded: string }>();
       let hasMoreInBucket = true;
       let bucketCursor: string | undefined = undefined;
 
       while (hasMoreInBucket) {
-        const listOptions: R2ListOptions = {
-          limit: 1000,
-        };
-        
-        if (bucketCursor) {
-          listOptions.cursor = bucketCursor;
-        }
-
-        const listed = await env.R2_BUCKET.list(listOptions);
-
+        const listed = (await env.R2_BUCKET.list({ limit: 1000, cursor: bucketCursor })) as any;
         for (const obj of listed.objects) {
           if (obj.key.toLowerCase().endsWith(".pdf")) {
-            files.push({
+            r2Files.set(obj.key, {
               key: obj.key,
               size: obj.size,
               uploaded: obj.uploaded.toISOString(),
             });
           }
         }
-
         hasMoreInBucket = listed.truncated;
         bucketCursor = listed.truncated ? listed.cursor : undefined;
       }
 
-      return new Response(
-        JSON.stringify({
-          files,
-          totalReturned: files.length,
-        }),
-        {
-          headers: {
-            ...cacheHeaders,
-            "Content-Type": "application/json",
-          },
+      // 2. Get manifest to find files that might be on DOJ instead of R2
+      const manifestObject = await env.R2_BUCKET.get("pdfs-as-jpegs/manifest.json");
+      if (manifestObject) {
+        const manifest = (await manifestObject.json()) as Record<string, any>;
+        for (const key of Object.keys(manifest)) {
+          if (!r2Files.has(key)) {
+            r2Files.set(key, {
+              key: key,
+              size: 0, // Size unknown since it's on DOJ
+              uploaded: new Date().toISOString(),
+            });
+          }
         }
-      );
+      }
+
+      const files = Array.from(r2Files.values());
+      return new Response(JSON.stringify({ files, totalReturned: files.length }), {
+        headers: { ...cacheHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // List files endpoint (paginated)
@@ -217,7 +215,7 @@ export default {
           prefix,
           limit: 1000,
         };
-        
+
         if (isFirstRequest && startAfter) {
           listOptions.startAfter = startAfter;
           isFirstRequest = false;
@@ -244,10 +242,10 @@ export default {
       // Trim to limit and determine if there's more
       const hasMore = files.length > limit || hasMoreInBucket;
       const returnFiles = files.slice(0, limit);
-      
+
       // Use the last key as cursor for next request
-      const nextCursor = hasMore && returnFiles.length > 0 
-        ? returnFiles[returnFiles.length - 1].key 
+      const nextCursor = hasMore && returnFiles.length > 0
+        ? returnFiles[returnFiles.length - 1].key
         : null;
 
       return new Response(
@@ -270,7 +268,21 @@ export default {
     const object = await env.R2_BUCKET.get(path);
 
     if (!object) {
-      return new Response("Not Found", { 
+      // If it's a PDF and not in R2, attempt to redirect to justice.gov
+      if (path.endsWith(".pdf")) {
+        const parts = path.split("/");
+        // Pattern: VOL00001/IMAGES/0001/EFTA00000001.pdf
+        const volumePrefix = parts[0];
+        const filename = parts[parts.length - 1];
+
+        if (volumePrefix.startsWith("VOL")) {
+          const volNum = parseInt(volumePrefix.replace("VOL", ""), 10);
+          const dojUrl = `https://www.justice.gov/epstein/files/DataSet%20${volNum}/${filename}`;
+          return Response.redirect(dojUrl, 302);
+        }
+      }
+
+      return new Response("Not Found", {
         status: 404,
         headers: cacheHeaders,
       });
